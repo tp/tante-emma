@@ -4,11 +4,10 @@
 # DB is on a paid plan because the free Postgres slot is in use by another project
 # (Render allows only one free Postgres per account).
 #
-# Risk-first note: db:push is intentionally NOT in buildCommand. The M0 gate is
-# "claude.ai can call the `ping` tool" — that needs no database. Keeping schema
-# push out of the deploy path means a DB hiccup can't block the M0 gate.
-# Once tables are needed (M2), run `pnpm db:push` against DATABASE_URL
-# (locally or from the Render service shell).
+# Migrations run at startup (src/db/migrate.ts), NOT in buildCommand, and are
+# fire-and-forget: a DB hiccup logs but never crashes the process, so /healthz
+# and the MCP `ping` keep serving (the M0 risk guarantee). Migration SQL lives in
+# drizzle/ and is generated from src/db/schema.ts via `pnpm db:generate`.
 
 databases:
   - name: tante-emma-db

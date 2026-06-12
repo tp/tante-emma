@@ -9,6 +9,12 @@
 
 import type { Express, Request, Response } from 'express';
 import { TWILIO_ACCOUNT_SID, TWILIO_WHATSAPP_FROM, requireEnv } from './env.js';
+import { handleMerchantMessage } from './merchant/apply.js';
+
+/** Twilio's `From` arrives as `whatsapp:+49…`; strip the channel prefix to E.164. */
+function fromWhatsAppNumber(value: string): string {
+  return value.replace(/^whatsapp:/, '').trim();
+}
 
 /** Minimal XML escaping for text placed inside a TwiML <Message> element. */
 function escapeXml(s: string): string {
@@ -74,13 +80,22 @@ export async function sendWhatsApp(to: string, body: string): Promise<void> {
 /** Register the inbound webhook and a debug outbound endpoint. */
 export function mountWhatsApp(app: Express): void {
   // Inbound WhatsApp. Twilio sends application/x-www-form-urlencoded with
-  // `From`, `Body`, etc. We echo for the M1 gate; M2 replaces the echo with the
-  // merchant brain. TODO(prod): validate the X-Twilio-Signature header.
-  app.post('/webhooks/twilio', (req: Request, res: Response) => {
-    const from = String(req.body.From ?? '');
-    const text = String(req.body.Body ?? '');
-    console.log(`[whatsapp] inbound from ${from}: ${text}`);
-    res.type('text/xml').send(twimlMessage(`Tante Emma heard: "${text}"`));
+  // `From`, `Body`, etc. The merchant brain (M2) parses the message, applies
+  // catalog mutations, and returns a templated confirmation we reply with via
+  // TwiML. TODO(prod): validate the X-Twilio-Signature header.
+  app.post('/webhooks/twilio', async (req: Request, res: Response) => {
+    const phone = fromWhatsAppNumber(String(req.body.From ?? ''));
+    const text = String(req.body.Body ?? '').trim();
+    console.log(`[whatsapp] inbound from ${phone}: ${text}`);
+    try {
+      const reply = await handleMerchantMessage(phone, text);
+      res.type('text/xml').send(twimlMessage(reply));
+    } catch (err) {
+      console.error('[whatsapp] merchant handling failed:', err);
+      res
+        .type('text/xml')
+        .send(twimlMessage('⚠️ Something went wrong on our end — please try again in a moment.'));
+    }
   });
 
   // Debug-only: trigger an unsolicited outbound message to prove the REST path

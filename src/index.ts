@@ -5,6 +5,7 @@ import express from 'express';
 import { PORT, PUBLIC_BASE_URL, ENV_LABEL } from './env.js';
 import { mountMcp } from './mcp.js';
 import { mountWhatsApp } from './whatsapp.js';
+import { runMigrations } from './db/migrate.js';
 
 const app = express();
 
@@ -45,4 +46,13 @@ and an MCP server appear; any AI assistant can browse the catalog and place a pi
 app.listen(PORT, () => {
   console.log(`tante-emma listening on :${PORT} (${ENV_LABEL})`);
   console.log(`MCP endpoint: ${PUBLIC_BASE_URL}/mcp`);
+
+  // Apply pending DB migrations after the server is already accepting requests.
+  // Fire-and-forget: a failure here must not crash the process — /healthz and the
+  // MCP `ping` keep serving so the claude.ai connector is never taken down by a
+  // database problem. The merchant brain / storefront simply won't work until the
+  // DB is reachable, which the logs will make obvious.
+  runMigrations()
+    .then(() => console.log('[db] migrations applied'))
+    .catch((err) => console.error('[db] migration failed (continuing):', err));
 });
