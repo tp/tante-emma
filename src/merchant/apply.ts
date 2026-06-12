@@ -7,6 +7,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
 import { PUBLIC_BASE_URL } from '../env.js';
 import { parseMerchantMessage } from './parse.js';
+import { markReady } from '../orders.js';
 import type { Product, Shop } from '../db/schema.js';
 
 const { shops, products } = schema;
@@ -82,6 +83,18 @@ export async function handleMerchantMessage(phone: string, message: string): Pro
   const currentProducts = shop
     ? await db.select().from(products).where(eq(products.shopId, shop.id))
     : [];
+
+  // Bare order number (e.g. "12" or "#12") → mark that order ready for pickup,
+  // skipping the LLM entirely. Workaround for WhatsApp 👍 reactions not hitting
+  // the webhook. Scoped to the texting merchant's own shop.
+  const numberMatch = message.trim().match(/^#?(\d+)$/);
+  if (numberMatch && shop) {
+    const orderNumber = Number(numberMatch[1]);
+    const order = await markReady(shop.id, orderNumber);
+    return order
+      ? `✅ Order #${orderNumber} marked ready for pickup.`
+      : `🤔 No paid order #${orderNumber} in your shop.`;
+  }
 
   const actions = await parseMerchantMessage(message, currentProducts);
 

@@ -8,6 +8,13 @@
       "when": 1781294148780,
       "tag": "0000_bored_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781297292569,
+      "tag": "0001_fuzzy_sunspot",
+      "breakpoints": true
     }
   ]
 }

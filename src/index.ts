@@ -6,6 +6,8 @@ import { PORT, PUBLIC_BASE_URL, ENV_LABEL } from './env.js';
 import { mountMcp } from './mcp.js';
 import { mountWhatsApp } from './whatsapp.js';
 import { mountStorefront } from './storefront.js';
+import { mountOrderPage } from './order_page.js';
+import { layout } from './ui.js';
 import { runMigrations } from './db/migrate.js';
 
 const app = express();
@@ -29,22 +31,22 @@ mountWhatsApp(app);
 // Storefront HTML, per-shop llms.txt, and the static agent card (M3).
 mountStorefront(app);
 
+// Buyer-facing order page: pay + live status polling (M3.5).
+mountOrderPage(app);
+
 // Landing: the thesis in one paragraph + where agents connect.
 app.get('/', (_req, res) => {
-  res.type('html').send(`<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tante Emma</title>
-<style>body{font-family:system-ui,sans-serif;max-width:42rem;margin:4rem auto;padding:0 1.25rem;line-height:1.6;color:#1a1a1a}code{background:#f2f2f2;padding:.15rem .4rem;border-radius:.3rem}</style>
-</head>
-<body>
-<h1>Tante Emma</h1>
-<p>Everyone is making Shopify stores agent-ready. We make the shop that <em>doesn't have a website</em>
-agent-ready &mdash; and the admin panel is a text message. A merchant texts WhatsApp; a live storefront
-and an MCP server appear; any AI assistant can browse the catalog and place a pickup order.</p>
-<p>Agents connect here: <code>${PUBLIC_BASE_URL}/mcp</code></p>
-</body>
-</html>`);
+  res.type('html').send(
+    layout({
+      title: 'Tante Emma — the corner shop, agent-ready',
+      body: `
+<h1>The shop that doesn't have a website, made agent-ready.</h1>
+<p class="tagline">And the admin panel is a text message.</p>
+<p class="muted">A merchant texts WhatsApp; a live storefront and an MCP server appear. Any AI
+assistant can browse the catalog and place a pickup order &mdash; and the buyer pays from a link.</p>
+<div class="callout">🔌 <strong>Agents connect here:</strong> <code>${PUBLIC_BASE_URL}/mcp</code></div>`,
+    }),
+  );
 });
 
 app.listen(PORT, () => {
@@ -53,7 +55,7 @@ app.listen(PORT, () => {
 
   // Apply pending DB migrations after the server is already accepting requests.
   // Fire-and-forget: a failure here must not crash the process — /healthz and the
-  // MCP `ping` keep serving so the claude.ai connector is never taken down by a
+  // MCP endpoint keep serving so the claude.ai connector is never taken down by a
   // database problem. The merchant brain / storefront simply won't work until the
   // DB is reachable, which the logs will make obvious.
   runMigrations()

@@ -12,7 +12,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { PUBLIC_BASE_URL } from './env.js';
 import { euro } from './format.js';
-import { getShopWithCatalog, listLiveShops, placeOrder } from './catalog.js';
+import { getShopWithCatalog, listLiveShops } from './catalog.js';
+import { placeOrder } from './orders.js';
 
 /** Build a fresh MCP server instance with the current tool set. */
 function buildServer(): McpServer {
@@ -83,7 +84,7 @@ function buildServer(): McpServer {
     {
       title: 'Place order',
       description:
-        'Places a binding pickup order at a shop. ALWAYS confirm the items, pickup time, and customer name with the user before calling. Prices are in EUR and payment is at pickup. Item names must match the catalog (call get_catalog first if unsure).',
+        'Creates a pickup order in a pending state and returns a link the buyer must open to pay. The order is confirmed and sent to the shop ONLY after payment — relay the returned link and tell the buyer to open it to complete the order. ALWAYS confirm the items, pickup time, and customer name with the user before calling. Prices are in EUR. Item names must match the catalog (call get_catalog first if unsure).',
       inputSchema: {
         shop_slug: z.string().describe('The shop slug from list_shops / get_catalog.'),
         items: z

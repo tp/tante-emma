@@ -9,10 +9,15 @@ import {
   boolean,
   jsonb,
   timestamp,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const shopStatus = pgEnum('shop_status', ['draft', 'live']);
-export const orderStatus = pgEnum('order_status', ['placed', 'confirmed', 'rejected']);
+
+/** Order lifecycle. Plain text (not a pg enum) so the set can evolve without
+ * Postgres enum-alteration pain. `markPaid` is the single payment-confirmed seam. */
+export type OrderStatus = 'pending_payment' | 'paid' | 'ready';
 
 /** Per-shop look & feel, set by the M6 "vibe restyle" flow. Whitelist-validated. */
 export type ShopConfig = {
@@ -66,10 +71,14 @@ export const orders = pgTable('orders', {
   pickupTime: text('pickup_time'),
   note: text('note'),
   totalCents: integer('total_cents').notNull(),
-  status: orderStatus('status').notNull().default('placed'),
+  status: text('status').$type<OrderStatus>().notNull().default('pending_payment'),
   paymentLinkUrl: text('payment_link_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  // DB-level validation in place of a pg enum — easy to evolve (alter one
+  // constraint) without the enum ALTER-TYPE transaction pain.
+  check('orders_status_check', sql`${t.status} in ('pending_payment', 'paid', 'ready')`),
+]);
 
 export type Shop = typeof shops.$inferSelect;
 export type NewShop = typeof shops.$inferInsert;
