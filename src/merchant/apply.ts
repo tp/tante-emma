@@ -97,6 +97,19 @@ export async function handleMerchantMessage(phone: string, message: string): Pro
       : `🤔 No paid order #${orderNumber} in your shop.`;
   }
 
+  // Demo reset: a one-word "start over" for live demos. Deletes the texting
+  // merchant's own shop — cascading to its products + orders — so the next message
+  // re-creates it from a blank slate. Scoped to the sender, so it can only ever
+  // clear your own shop (the WhatsApp counterpart of `pnpm demo:reset`).
+  if (['reset', 'reset shop', 'start over'].includes(message.trim().toLowerCase())) {
+    if (!shop) {
+      return "🧹 Nothing to reset — you don't have a shop yet. Text me to create one.";
+    }
+    const name = shop.name;
+    await db.delete(shops).where(eq(shops.id, shop.id));
+    return `🧹 Reset done — "${name}" and its products + orders are gone. Text me to start fresh.`;
+  }
+
   // Publish / discard a pending restyle draft. Keyword shortcut (skips the LLM),
   // gated on a draft actually being pending so a casual "ok" elsewhere is ignored.
   if (shop && shop.previewToken) {
