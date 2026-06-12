@@ -12,6 +12,11 @@ export const PUBLIC_BASE_URL = (
 // M0 gate screenshot proves *which* deployment claude.ai reached.
 export const ENV_LABEL = process.env.RENDER ? 'render' : 'local';
 
+// Twilio WhatsApp sandbox credentials. Read lazily (via requireEnv at call time)
+// so the app still boots for M0/M1 inbound echo before outbound is wired.
+export const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID ?? '';
+export const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM ?? '';
+
 /** Read a required env var, throwing a clear error if missing. */
 export function requireEnv(name: string): string {
   const value = process.env[name];

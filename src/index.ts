@@ -4,6 +4,7 @@
 import express from 'express';
 import { PORT, PUBLIC_BASE_URL, ENV_LABEL } from './env.js';
 import { mountMcp } from './mcp.js';
+import { mountWhatsApp } from './whatsapp.js';
 
 const app = express();
 
@@ -19,6 +20,9 @@ app.get('/healthz', (_req, res) => {
 
 // MCP streamable HTTP endpoint (stateless) at POST /mcp.
 mountMcp(app);
+
+// WhatsApp inbound webhook + outbound helper (M1).
+mountWhatsApp(app);
 
 // Landing: the thesis in one paragraph + where agents connect.
 app.get('/', (_req, res) => {
