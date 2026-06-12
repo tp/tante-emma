@@ -14,7 +14,7 @@ import { ENV_LABEL } from './env.js';
 /** Build a fresh MCP server instance with the current tool set. */
 function buildServer(): McpServer {
   const server = new McpServer({
-    name: 'texted-shopfront',
+    name: 'tante-emma',
     version: '0.1.0',
   });
 

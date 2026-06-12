@@ -1,4 +1,4 @@
-# Texted Shopfront — Hackathon Build Plan
+# Tante Emma — Hackathon Build Plan
 
 **One-liner:** Everyone is making Shopify stores agent-ready. We make the shop that doesn't have a website agent-ready — and the admin panel is a text message.
 

@@ -1,4 +1,4 @@
-# Texted Shopfront
+# Tante Emma
 
 The shop that doesn't have a website, made agent-ready — and the admin panel is a
 text message. See [PLAN.md](PLAN.md) for the full build contract.
