@@ -1,0 +1,46 @@
+# Render Blueprint — one Web Service (free) + one managed Postgres (smallest paid).
+# DB is on a paid plan because the free Postgres slot is in use by another project
+# (Render allows only one free Postgres per account).
+#
+# Risk-first note: db:push is intentionally NOT in buildCommand. The M0 gate is
+# "claude.ai can call the `ping` tool" — that needs no database. Keeping schema
+# push out of the deploy path means a DB hiccup can't block the M0 gate.
+# Once tables are needed (M2), run `pnpm db:push` against DATABASE_URL
+# (locally or from the Render service shell).
+
+databases:
+  - name: texted-shopfront-db
+    plan: basic-256mb
+    region: frankfurt
+    databaseName: texted_shopfront
+    user: texted_shopfront
+
+services:
+  - type: web
+    name: texted-shopfront
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: pnpm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: texted-shopfront-db
+          property: connectionString
+      - key: PUBLIC_BASE_URL
+        sync: false # set to https://<service>.onrender.com after first deploy
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
