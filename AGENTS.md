@@ -12,7 +12,7 @@ A shop that has **no website**, made agent-ready — and the admin panel is a te
 - **Express 5** — one process, all routes.
 - **MCP**: `@modelcontextprotocol/sdk` 1.29, `McpServer` + streamable HTTP, **stateless** (no session IDs), mounted at `POST /mcp`.
 - **DB**: Drizzle ORM + `postgres` driver, Postgres.
-- **LLM**: `@anthropic-ai/sdk`, `claude-haiku-4-5` for merchant-message parsing (fast/cheap, German+English).
+- **LLM**: `@anthropic-ai/sdk` — `claude-haiku-4-5` for merchant-message parsing (fast/cheap, German+English); `claude-opus-4-8` for restyle CSS generation (a redesign is a real coding task; runs async so latency is free). `gpt-image-2` (OpenAI) for restyle imagery.
 - **WhatsApp**: Twilio sandbox. Inbound webhook (form-encoded) + outbound via REST (`fetch`, no SDK).
 - **Deploy**: Render Blueprint ([render.yaml](render.yaml)) — Web Service (`starter`) + managed Postgres (`basic-256mb`), Frankfurt.
 
