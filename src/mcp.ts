@@ -7,9 +7,12 @@
 // collisions, and torn down when the response closes.
 
 import type { Express, Request, Response } from 'express';
+import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { ENV_LABEL } from './env.js';
+import { PUBLIC_BASE_URL } from './env.js';
+import { euro } from './format.js';
+import { getShopWithCatalog, listLiveShops, placeOrder } from './catalog.js';
 
 /** Build a fresh MCP server instance with the current tool set. */
 function buildServer(): McpServer {
@@ -18,16 +21,96 @@ function buildServer(): McpServer {
     version: '0.1.0',
   });
 
-  // M0 dummy tool. Replaced by the real catalog/order tools in M3.
+  // Discover shops. Tool descriptions are product copy for agents — keep them
+  // precise so the model calls the right tool with the right arguments.
   server.registerTool(
-    'ping',
+    'list_shops',
     {
-      title: 'Ping',
-      description: 'Health probe. Returns "pong from <env>" so you can confirm the connector reached the live server.',
+      title: 'List shops',
+      description:
+        'List the live shops on Tante Emma (name, slug, tagline). Call this first to discover which shops exist before fetching a catalog or placing an order.',
     },
-    async () => ({
-      content: [{ type: 'text', text: `pong from ${ENV_LABEL}` }],
-    }),
+    async () => {
+      const shops = await listLiveShops();
+      if (shops.length === 0) {
+        return { content: [{ type: 'text', text: 'No live shops yet.' }] };
+      }
+      const text = shops
+        .map((s) => `- ${s.name} (slug: ${s.slug})${s.tagline ? ` — ${s.tagline}` : ''}`)
+        .join('\n');
+      return { content: [{ type: 'text', text }] };
+    },
+  );
+
+  // Fetch one shop's available catalog.
+  server.registerTool(
+    'get_catalog',
+    {
+      title: 'Get catalog',
+      description:
+        "Get a shop's details and available products with prices. Pass the shop_slug from list_shops. Use this to see what can be ordered and the exact product names.",
+      inputSchema: {
+        shop_slug: z.string().describe('The shop slug, e.g. "baeckerei-demo".'),
+      },
+    },
+    async ({ shop_slug }) => {
+      const catalog = await getShopWithCatalog(shop_slug);
+      if (!catalog) {
+        return {
+          content: [{ type: 'text', text: `No shop found with slug "${shop_slug}".` }],
+          isError: true,
+        };
+      }
+      const { shop, products } = catalog;
+      const header = [shop.name, shop.tagline, shop.description].filter(Boolean).join(' — ');
+      const items = products.length
+        ? products.map((p) => `- ${p.name} — ${euro(p.priceCents)}`).join('\n')
+        : '(no items available right now)';
+      const text = [
+        header,
+        `Storefront: ${PUBLIC_BASE_URL}/s/${shop.slug}`,
+        '',
+        'Available items:',
+        items,
+      ].join('\n');
+      return { content: [{ type: 'text', text }] };
+    },
+  );
+
+  // Place a binding pickup order.
+  server.registerTool(
+    'place_order',
+    {
+      title: 'Place order',
+      description:
+        'Places a binding pickup order at a shop. ALWAYS confirm the items, pickup time, and customer name with the user before calling. Prices are in EUR and payment is at pickup. Item names must match the catalog (call get_catalog first if unsure).',
+      inputSchema: {
+        shop_slug: z.string().describe('The shop slug from list_shops / get_catalog.'),
+        items: z
+          .array(
+            z.object({
+              product_name: z
+                .string()
+                .optional()
+                .describe('Product name exactly as shown in the catalog.'),
+              product_id: z.number().int().optional().describe('Product id (alternative to name).'),
+              qty: z.number().int().min(1).describe('Quantity, at least 1.'),
+            }),
+          )
+          .min(1)
+          .describe('One entry per distinct product.'),
+        customer_name: z.string().describe("The customer's name for the order."),
+        pickup_time: z.string().describe('When the customer will collect, e.g. "16:00".'),
+        note: z.string().optional().describe('Optional note for the merchant.'),
+      },
+    },
+    async (args) => {
+      const result = await placeOrder(args);
+      if (!result.ok) {
+        return { content: [{ type: 'text', text: result.error }], isError: true };
+      }
+      return { content: [{ type: 'text', text: result.confirmation }] };
+    },
   );
 
   return server;

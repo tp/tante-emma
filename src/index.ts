@@ -5,6 +5,7 @@ import express from 'express';
 import { PORT, PUBLIC_BASE_URL, ENV_LABEL } from './env.js';
 import { mountMcp } from './mcp.js';
 import { mountWhatsApp } from './whatsapp.js';
+import { mountStorefront } from './storefront.js';
 import { runMigrations } from './db/migrate.js';
 
 const app = express();
@@ -24,6 +25,9 @@ mountMcp(app);
 
 // WhatsApp inbound webhook + outbound helper (M1).
 mountWhatsApp(app);
+
+// Storefront HTML, per-shop llms.txt, and the static agent card (M3).
+mountStorefront(app);
 
 // Landing: the thesis in one paragraph + where agents connect.
 app.get('/', (_req, res) => {
