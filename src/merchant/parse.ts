@@ -81,7 +81,7 @@ const INPUT_SCHEMA: Anthropic.Tool.InputSchema = {
           want_images: {
             type: 'boolean',
             description:
-              'For restyle only: true if the merchant wants generated imagery (a banner/photo/mood image or a printable menu poster), false for a CSS-only restyle.',
+              'For restyle only. Default true: a redesign should include a generated mood banner + printable menu poster. Set false ONLY if the merchant explicitly wants just colours/text tweaks with no pictures.',
           },
           reason: {
             type: 'string',
@@ -113,8 +113,8 @@ function systemPrompt(products: Product[]): string {
     '- set_availability: mark a product available or sold out by name.',
     '- restyle: the merchant wants to change the look/design/style/colours/vibe of their storefront',
     '  (e.g. "make it feel Bavarian and rustic", "give it a modern dark theme", "add a header photo").',
-    '  Put their request verbatim in `instruction`. Set `want_images` true if they mention any imagery',
-    '  (banner, photo, picture, header image, mood image, printable menu/poster); otherwise false.',
+    '  Put their request verbatim in `instruction`. Default `want_images` to true (a redesign includes a',
+    '  generated banner + printable menu poster); set it false only if they clearly want colours/text only.',
     '- unparseable: the message is not a catalog instruction. Set reason. Prefer this over guessing.',
     '',
     'Rules:',

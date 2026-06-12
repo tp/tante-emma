@@ -28,12 +28,16 @@ export async function buildLook(
   const design = await generateDesign(instruction, shop, catalog);
   const config: ShopConfig = { css: design.css, moodPrompt: design.moodPrompt };
   if (wantImages) {
-    const [headerImage, menuImage] = await Promise.all([
+    // Non-fatal: a missing OPENAI_API_KEY or an image hiccup degrades to CSS-only
+    // rather than dropping the whole restyle. allSettled keeps whichever succeeds.
+    const [banner, poster] = await Promise.allSettled([
       generateBanner(design.moodPrompt),
       generateMenuPoster(design.moodPrompt, shop, catalog),
     ]);
-    config.headerImage = headerImage;
-    config.menuImage = menuImage;
+    if (banner.status === 'fulfilled') config.headerImage = banner.value;
+    else console.error('[restyle] banner generation failed:', banner.reason);
+    if (poster.status === 'fulfilled') config.menuImage = poster.value;
+    else console.error('[restyle] menu poster generation failed:', poster.reason);
   }
   return config;
 }

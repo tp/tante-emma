@@ -252,7 +252,8 @@ export async function handleMerchantMessage(phone: string, message: string): Pro
         .map((a) => a.instruction)
         .filter((i): i is string => !!i)
         .join('. ');
-      const wantImages = restyleActions.some((a) => a.want_images);
+      // Default images on for a restyle; only off when the parser explicitly said so.
+      const wantImages = restyleActions.some((a) => a.want_images !== false);
       if (instruction) {
         void runRestyleAndNotify(shop.id, instruction, wantImages, phone).catch((err) =>
           console.error('[restyle] async run failed:', err),

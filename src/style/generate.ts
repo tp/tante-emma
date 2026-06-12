@@ -13,7 +13,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import type { Product, Shop } from '../db/schema.js';
 
-const MODEL = 'claude-sonnet-4-6';
+// A full storefront redesign is a real coding task — use the strongest model.
+// The restyle path is async (off the webhook), so the extra latency is free.
+const MODEL = 'claude-opus-4-8';
 
 let _client: Anthropic | undefined;
 function client(): Anthropic {
