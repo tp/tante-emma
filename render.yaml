@@ -1,4 +1,6 @@
-# Render Blueprint — one Web Service (free) + one managed Postgres (smallest paid).
+# Render Blueprint — one Web Service (starter) + one managed Postgres (smallest paid).
+# Web service is on starter (not free) so it never spins down — a cold start mid-demo
+# would mean a 30s+ delay on the first request from claude.ai / WhatsApp.
 # DB is on a paid plan because the free Postgres slot is in use by another project
 # (Render allows only one free Postgres per account).
 #
@@ -19,7 +21,7 @@ services:
   - type: web
     name: tante-emma
     runtime: node
-    plan: free
+    plan: starter
     region: frankfurt
     branch: main
     buildCommand: corepack enable && pnpm install --frozen-lockfile
