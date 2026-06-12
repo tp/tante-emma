@@ -15,6 +15,13 @@
       "when": 1781297292569,
       "tag": "0001_fuzzy_sunspot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781299589522,
+      "tag": "0002_glorious_ink",
+      "breakpoints": true
     }
   ]
 }

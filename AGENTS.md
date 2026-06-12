@@ -25,24 +25,30 @@ A shop that has **no website**, made agent-ready — and the admin panel is a te
 | [src/mcp.ts](src/mcp.ts) | MCP server. Stateless streamable HTTP at `POST /mcp`. Currently the `ping` tool (replaced by real tools in M3) |
 | [src/whatsapp.ts](src/whatsapp.ts) | Twilio inbound webhook → merchant brain; `sendWhatsApp(to, body)` outbound helper; `/debug/send` test endpoint |
 | [src/merchant/parse.ts](src/merchant/parse.ts) | One forced-tool Anthropic call → validated `MerchantAction[]` (PLAN §4) |
-| [src/merchant/apply.ts](src/merchant/apply.ts) | Applies actions in a transaction → **templated** WhatsApp reply; slug generation |
+| [src/merchant/apply.ts](src/merchant/apply.ts) | Applies actions in a transaction → **templated** WhatsApp reply; slug generation; restyle draft + publish/revert |
+| [src/style/generate.ts](src/style/generate.ts) | Restyle: Sonnet → custom CSS + `moodPrompt`; `sanitizeCss()` (the XSS seam) |
+| [src/style/image.ts](src/style/image.ts) | `gpt-image-2` (via `fetch`, no SDK) → mood banner + printable menu poster |
+| [src/style/restyle.ts](src/style/restyle.ts) | Composes a full look (`buildLook`); `refreshLiveMenuImage` keeps the poster current |
 | [src/db/schema.ts](src/db/schema.ts) | **Canonical schema** (PLAN §2). Edit tables here |
 | [src/db/index.ts](src/db/index.ts) | Lazy Drizzle client (`getDb()`) — boots without `DATABASE_URL` |
 | [src/db/migrate.ts](src/db/migrate.ts) | Applies `drizzle/*.sql` at startup, non-blocking |
 | [drizzle/](drizzle/) | **Generated** migration SQL (committed — it's what runs in prod) |
-| `scripts/` | `seed.ts`, `demo-reset.ts` (M4 demo hardening) |
+| `scripts/` | `demo-reset.ts` — blank-slate wipe (delete shops → cascade) to re-run live creation |
 
 ## Routes
 
 | Route | Purpose | Status |
 | --- | --- | --- |
-| `POST /mcp` | MCP streamable HTTP (stateless) | M0 ✅ (`ping`) |
+| `POST /mcp` | MCP streamable HTTP (stateless) — `list_shops`, `get_catalog`, `place_order` | M3 ✅ |
 | `POST /webhooks/twilio` | Inbound WhatsApp → merchant brain | M1/M2 ✅ |
 | `GET /debug/send?to=%2B49…` | Outbound test (encode `+` as `%2B`) | M1 ✅ |
 | `GET /healthz` | Render health check | M0 ✅ |
 | `GET /` | Landing page | M0 ✅ |
-| `GET /s/:slug` + `llms.txt` | Storefront | **M3 — not built** |
-| `GET /.well-known/agent-card.json` | A2A card | **M3 — not built** |
+| `GET /s/:slug` | Storefront HTML + schema.org JSON-LD. `?preview=<token>` shows draft look; `?view=image` shows printable menu poster | M3 ✅ / restyle |
+| `GET /s/:slug/header` | Mood banner image (preview-aware via `?preview`) | restyle |
+| `GET /s/:slug/menu.png` | Printable menu poster image (preview-aware) | restyle |
+| `GET /s/:slug/llms.txt` | Per-shop agent guidance | M3 ✅ |
+| `GET /.well-known/agent-card.json` | Static A2A card | M3 ✅ |
 
 ## DB workflow
 
@@ -64,6 +70,7 @@ edit src/db/schema.ts  →  pnpm db:generate  →  commit drizzle/*.sql  →  au
 - **Confirmations are deterministic templates, never freeform LLM prose** (PLAN §M2.2). A mis-parse must never produce a convincing-but-wrong confirmation. The LLM only parses; `apply.ts` writes the reply.
 - **Lazy clients** (DB in `db/index.ts`, Anthropic in `parse.ts`): the app boots and serves `/healthz` + MCP `ping` even with no secrets/DB. This is the M0 risk guarantee — don't make boot depend on external services.
 - MCP tool descriptions are **product copy for agents** — write them carefully (M3).
+- **Restyle** (look & feel): merchant texts a vibe ("make it Bavarian and rustic, with a header image") → a **draft** look is generated and the bot returns a token-gated preview link; the merchant replies `ok` (publish) / `revert` (discard). Custom CSS is **layered over the base theme and sanitized** (`sanitizeCss` in `style/generate.ts`) — the base stays a safe floor. Images use `gpt-image-2`; the menu poster auto-refreshes on catalog edits.
 
 ## Gotchas
 
@@ -88,13 +95,14 @@ Local boot needs nothing; full function needs `DATABASE_URL`, `ANTHROPIC_API_KEY
 
 - Push to `main` → Render Blueprint deploys (`branch: main` in render.yaml). Migrations apply on boot.
 - Public URL: `https://tante-emma.onrender.com`, MCP at `…/mcp`.
-- `sync: false` env vars (set by hand in Render dashboard): `PUBLIC_BASE_URL` (= the onrender URL, no trailing slash), `ANTHROPIC_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `STRIPE_SECRET_KEY` (M5).
+- `sync: false` env vars (set by hand in Render dashboard): `PUBLIC_BASE_URL` (= the onrender URL, no trailing slash), `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (restyle images), `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `STRIPE_SECRET_KEY` (M5).
 - `DATABASE_URL` is injected from the managed Postgres automatically.
 
 ## Milestone status
 
 - **M0** ✅ Walking skeleton — claude.ai connector calls `ping` → `pong from render`.
 - **M1** ✅ WhatsApp loop — inbound + outbound verified on a real phone.
-- **M2** ✅ Merchant brain built (parse → mutate → templated reply). **Gate pending**: set `ANTHROPIC_API_KEY`, push, run the scripted sequence (PLAN §M2.4) over WhatsApp.
-- **M3** ⏭ Real MCP tools (`list_shops`/`get_catalog`/`place_order`) + storefront `/s/:slug` + `llms.txt` + agent card. The money-shot demo loop.
-- **M4–M6**: demo hardening, optional Stripe, stretch (vibe restyle / second agent). See PLAN.
+- **M2** ✅ Merchant brain — WhatsApp text → parse → mutate → templated reply. Verified live (shop created over WhatsApp).
+- **M3** ✅ Real MCP tools (`list_shops`/`get_catalog`/`place_order`) + storefront `/s/:slug` + `llms.txt` + agent card. **Full demo loop verified end-to-end**: claude.ai connector placed an order → row written → merchant WhatsApp received.
+- **M4** ⏭ Demo hardening — `demo:reset` done (blank-slate wipe). Seed dropped (live WhatsApp creation suffices). Remaining: two clean back-to-back demo runs (PLAN §5).
+- **M5–M6**: optional Stripe test-mode payment link, stretch (vibe restyle / second agent). See PLAN.

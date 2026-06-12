@@ -16,6 +16,9 @@ export const ENV_LABEL = process.env.RENDER ? 'render' : 'local';
 // so the app still boots for M0/M1 inbound echo before outbound is wired.
 export const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID ?? '';
 export const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM ?? '';
+// Used both for outbound REST auth and to verify the X-Twilio-Signature on the
+// inbound webhook — the only thing authenticating the merchant admin surface.
+export const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN ?? '';
 
 /** Read a required env var, throwing a clear error if missing. */
 export function requireEnv(name: string): string {

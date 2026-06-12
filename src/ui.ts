@@ -33,6 +33,8 @@ header.site .wordmark{font-family:var(--serif);font-size:1.55rem;font-weight:700
   letter-spacing:.01em;display:inline-block}
 header.site .wordmark .dot{color:var(--amber)}
 header.site .kicker{margin:.15rem 0 0;font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.hero{max-width:44rem;height:11rem;margin:1.6rem auto 0;border-radius:16px;
+  background-size:cover;background-position:center;border:1px solid var(--line)}
 main{max-width:38rem;margin:2.4rem auto 1rem;padding:0 1.25rem}
 main.wide{max-width:44rem}
 h1{font-family:var(--serif);font-weight:700;font-size:2rem;line-height:1.12;margin:.1rem 0 .35rem}
@@ -71,6 +73,10 @@ export type LayoutOpts = {
   bodyEnd?: string;
   /** Wider main column. */
   wide?: boolean;
+  /** Sanitized custom stylesheet, injected after the base theme (restyle flow). */
+  customStyle?: string;
+  /** Background-image URL for the .hero banner. Server-controlled (preview-aware). */
+  heroImageUrl?: string;
 };
 
 /** Wrap page content in the shared shell (awning, header wordmark, footer). */
@@ -81,6 +87,7 @@ export function layout(opts: LayoutOpts): string {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.title)}</title>
 <style>${STYLES}</style>
+${opts.customStyle ? `<style>${opts.customStyle}</style>` : ''}
 ${opts.head ?? ''}
 </head>
 <body>
@@ -89,6 +96,7 @@ ${opts.head ?? ''}
   <a class="wordmark" href="/">Tante&nbsp;Emma<span class="dot">.</span></a>
   <p class="kicker">the corner shop, agent-ready</p>
 </header>
+${opts.heroImageUrl ? `<div class="hero" style="background-image:url('${esc(opts.heroImageUrl)}')"></div>` : ''}
 <main${opts.wide ? ' class="wide"' : ''}>
 ${opts.body}
 </main>

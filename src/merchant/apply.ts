@@ -7,6 +7,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
 import { PUBLIC_BASE_URL } from '../env.js';
 import { parseMerchantMessage } from './parse.js';
+import { runRestyleAndNotify, refreshLiveMenuImage } from '../style/restyle.js';
 import { markReady } from '../orders.js';
 import type { Product, Shop } from '../db/schema.js';
 
@@ -96,6 +97,26 @@ export async function handleMerchantMessage(phone: string, message: string): Pro
       : `🤔 No paid order #${orderNumber} in your shop.`;
   }
 
+  // Publish / discard a pending restyle draft. Keyword shortcut (skips the LLM),
+  // gated on a draft actually being pending so a casual "ok" elsewhere is ignored.
+  if (shop && shop.previewToken) {
+    const cmd = message.trim().toLowerCase();
+    if (['ok', 'publish', 'veröffentlichen', 'veroeffentlichen'].includes(cmd)) {
+      await db
+        .update(shops)
+        .set({ config: shop.draftConfig, draftConfig: {}, previewToken: null })
+        .where(eq(shops.id, shop.id));
+      return `✅ Published! Your new look is live → ${PUBLIC_BASE_URL}/s/${shop.slug}`;
+    }
+    if (['revert', 'cancel', 'discard', 'abbrechen'].includes(cmd)) {
+      await db
+        .update(shops)
+        .set({ draftConfig: {}, previewToken: null })
+        .where(eq(shops.id, shop.id));
+      return '↩️ Discarded the pending restyle. Your live look is unchanged.';
+    }
+  }
+
   const actions = await parseMerchantMessage(message, currentProducts);
 
   // Nothing actionable → graceful prompt, no rows touched.
@@ -103,10 +124,17 @@ export async function handleMerchantMessage(phone: string, message: string): Pro
     return shop ? HELP_REPLY : NEED_NAME;
   }
 
+  // Restyle calls slow LLM/image APIs, so it runs outside the catalog transaction.
+  const restyleActions = actions.filter((a) => a.type === 'restyle');
+  const catalogActions = actions.filter((a) => a.type !== 'restyle');
+  const productsMutated = catalogActions.some((a) =>
+    ['upsert_product', 'remove_product', 'set_availability'].includes(a.type),
+  );
+
   const lines: string[] = [];
 
   await db.transaction(async (tx) => {
-    for (const action of actions) {
+    for (const action of catalogActions) {
       switch (action.type) {
         case 'create_or_update_shop': {
           if (!shop) {
@@ -212,6 +240,35 @@ export async function handleMerchantMessage(phone: string, message: string): Pro
       }
     }
   });
+
+  // Restyle: the LLM + image calls are far too slow to ride Twilio's synchronous
+  // reply window, so we ack now and run generation off the webhook path, pushing
+  // the preview (link + inline image) via outbound WhatsApp when it's ready.
+  if (restyleActions.length) {
+    if (!shop) {
+      lines.push(NEED_NAME);
+    } else {
+      const instruction = restyleActions
+        .map((a) => a.instruction)
+        .filter((i): i is string => !!i)
+        .join('. ');
+      const wantImages = restyleActions.some((a) => a.want_images);
+      if (instruction) {
+        void runRestyleAndNotify(shop.id, instruction, wantImages, phone).catch((err) =>
+          console.error('[restyle] async run failed:', err),
+        );
+        lines.push("🎨 Working on your new look — I'll send a preview here in a moment…");
+      }
+    }
+  }
+
+  // Keep the live printable menu poster in sync after catalog edits — fire-and-forget
+  // so the merchant's confirmation isn't blocked on a slow image regeneration.
+  if (shop && productsMutated && shop.config.moodPrompt && shop.config.menuImage) {
+    void refreshLiveMenuImage(shop.id).catch((err) =>
+      console.error('[restyle] menu image refresh failed:', err),
+    );
+  }
 
   return lines.length ? lines.join('\n') : HELP_REPLY;
 }

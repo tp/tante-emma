@@ -19,11 +19,26 @@ export const shopStatus = pgEnum('shop_status', ['draft', 'live']);
  * Postgres enum-alteration pain. `markPaid` is the single payment-confirmed seam. */
 export type OrderStatus = 'pending_payment' | 'paid' | 'ready';
 
-/** Per-shop look & feel, set by the M6 "vibe restyle" flow. Whitelist-validated. */
+/** A generated raster asset, stored inline (base64) so it travels with the row. */
+export type ShopImage = { dataBase64: string; mime: string };
+
+/**
+ * Per-shop look & feel, set by the restyle flow. `shops.config` holds the live
+ * look; `shops.draftConfig` holds a pending preview the merchant approves before
+ * it goes live. The restyle LLM emits real CSS (layered over the base theme in
+ * ui.ts, sanitized) plus a saved visual `moodPrompt` that drives the generated
+ * images — so the printable menu poster can be regenerated when the menu changes
+ * while keeping the same mood.
+ */
 export type ShopConfig = {
-  accentColor?: string;
-  font?: string;
-  heroBlurb?: string;
+  /** Custom stylesheet for the web view, layered over the base theme (sanitized). */
+  css?: string;
+  /** Saved visual mood/scene prompt — regenerates the images on menu changes. */
+  moodPrompt?: string;
+  /** Mood banner shown atop the web view. */
+  headerImage?: ShopImage;
+  /** Full printable menu poster (the "image variant" toggle on the storefront). */
+  menuImage?: ShopImage;
 };
 
 export const shops = pgTable('shops', {
@@ -36,6 +51,10 @@ export const shops = pgTable('shops', {
   description: text('description'),
   status: shopStatus('status').notNull().default('draft'),
   config: jsonb('config').$type<ShopConfig>().notNull().default({}),
+  // Pending look awaiting merchant approval; copied into `config` on publish.
+  draftConfig: jsonb('draft_config').$type<ShopConfig>().notNull().default({}),
+  // Random token gating the preview URL so customers can't stumble into drafts.
+  previewToken: text('preview_token'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

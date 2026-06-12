@@ -25,6 +25,7 @@ const actionSchema = z.object({
     'upsert_product',
     'remove_product',
     'set_availability',
+    'restyle',
     'unparseable',
   ]),
   name: z.string().optional(),
@@ -32,6 +33,8 @@ const actionSchema = z.object({
   description: z.string().optional(),
   price_cents: z.number().int().nonnegative().optional(),
   available: z.boolean().optional(),
+  instruction: z.string().optional(),
+  want_images: z.boolean().optional(),
   reason: z.string().optional(),
 });
 export type MerchantAction = z.infer<typeof actionSchema>;
@@ -55,6 +58,7 @@ const INPUT_SCHEMA: Anthropic.Tool.InputSchema = {
               'upsert_product',
               'remove_product',
               'set_availability',
+              'restyle',
               'unparseable',
             ],
           },
@@ -69,6 +73,16 @@ const INPUT_SCHEMA: Anthropic.Tool.InputSchema = {
             description: 'Price in euro cents. "1,20"/"1 euro 20" → 120; "1.80"/"1 euro 80" → 180.',
           },
           available: { type: 'boolean' },
+          instruction: {
+            type: 'string',
+            description:
+              'For restyle only: the merchant\'s verbatim look-and-feel request (e.g. "make it feel Bavarian and rustic").',
+          },
+          want_images: {
+            type: 'boolean',
+            description:
+              'For restyle only: true if the merchant wants generated imagery (a banner/photo/mood image or a printable menu poster), false for a CSS-only restyle.',
+          },
           reason: {
             type: 'string',
             description: 'For unparseable only: why the message is not a catalog instruction.',
@@ -97,6 +111,10 @@ function systemPrompt(products: Product[]): string {
     '- upsert_product: add or update a product. Give name, plus price_cents and/or available and/or description when stated.',
     '- remove_product: delete a product by name.',
     '- set_availability: mark a product available or sold out by name.',
+    '- restyle: the merchant wants to change the look/design/style/colours/vibe of their storefront',
+    '  (e.g. "make it feel Bavarian and rustic", "give it a modern dark theme", "add a header photo").',
+    '  Put their request verbatim in `instruction`. Set `want_images` true if they mention any imagery',
+    '  (banner, photo, picture, header image, mood image, printable menu/poster); otherwise false.',
     '- unparseable: the message is not a catalog instruction. Set reason. Prefer this over guessing.',
     '',
     'Rules:',

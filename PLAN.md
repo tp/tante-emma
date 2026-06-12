@@ -62,8 +62,10 @@ MCP tools take `shop_slug` as a parameter so one MCP endpoint serves all shops. 
 
 ```ts
 shops:      id, slug (unique), phone (unique, E.164), name, tagline,
-            description, status ('draft'|'live'), config jsonb, created_at
-            // config: { accentColor?, font?, heroBlurb? } — used by M6 restyle only
+            description, status ('draft'|'live'), config jsonb,
+            draft_config jsonb, preview_token, created_at
+            // config / draft_config: { css?, moodPrompt?, headerImage?, menuImage? }
+            // live look vs. pending preview; restyle flow, see §M6
 
 products:   id, shop_id FK, name, description, price_cents int, currency ('EUR'),
             available bool default true, sort int, created_at
@@ -136,7 +138,7 @@ orders:     id, shop_id FK, items jsonb [{product_id, name, qty, price_cents}],
 
 In strict priority order:
 
-1. **Vibe restyle:** merchant texts "make it feel Bavarian and rustic" → LLM emits `config` patch (accent color, font choice from a fixed whitelist, hero blurb) → storefront renders from config. Highest wow-per-hour. Whitelist-validate everything; the LLM never emits raw CSS.
+1. **Vibe restyle (shipped, expanded):** merchant texts "make it feel Bavarian and rustic" → Sonnet emits a **real custom stylesheet** (layered over the base theme in `ui.ts`, **sanitized** against `</style>` breakout + `@import`) plus a saved `moodPrompt`. When images are requested, `gpt-image-2` generates a mood banner + a printable full-menu poster (the storefront's "image variant" toggle), both driven by the moodPrompt; the poster regenerates when the menu changes. The new look lands in `draft_config` and the bot replies with a **token-gated preview link** (`/s/:slug?preview=…`); the merchant replies `ok` to publish (copies draft→live) or `revert` to discard. **NOTE:** this deliberately reverses the original "the LLM never emits raw CSS" guardrail — raw CSS is now allowed but layered + sanitized, with the base theme as a safe floor.
 2. **Second agent:** connect the same MCP URL in ChatGPT developer mode → "one server, every agent" slide.
 3. **Confirm/reject:** merchant replies `1`/`2` to an order message → status update (+ buyer has no channel, so this only updates the storefront/order state — keep expectations modest).
 
